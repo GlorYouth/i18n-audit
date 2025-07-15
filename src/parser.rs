@@ -334,11 +334,11 @@ fn parse_toml(content: &str, language: &str, file_path: &str, defined_keys: &mut
     Ok(())
 } 
 
-/// 将扁平化的键值对（例如 "a.b.c": "value"）转换为嵌套的 serde_yaml::Value
-fn unflatten_to_nested_map(
+/// 将扁平化的键值对（例如 "a.b.c": "value"）转换为嵌套的 serde_json::Value
+fn unflatten_to_json_value(
     flat_keys: &BTreeMap<String, String>
-) -> serde_yaml::Value {
-    let mut root = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
+) -> serde_json::Value {
+    let mut root = serde_json::Value::Object(serde_json::Map::new());
 
     for (full_key, value) in flat_keys {
         let mut parts: Vec<&str> = full_key.split('.').collect();
@@ -347,22 +347,19 @@ fn unflatten_to_nested_map(
         let mut current_level = &mut root;
 
         for part in parts {
-            // get_mut or insert a new Mapping
-            let next_level = if let serde_yaml::Value::Mapping(mapping) = current_level {
-                mapping.entry(serde_yaml::Value::String(part.to_string()))
-                    .or_insert_with(|| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()))
+            let next_level = if let serde_json::Value::Object(map) = current_level {
+                map.entry(part.to_string())
+                    .or_insert_with(|| serde_json::Value::Object(serde_json::Map::new()))
             } else {
-                // Should not happen if the structure is consistent
                 continue;
             };
             current_level = next_level;
         }
 
-        // Insert the leaf value
-        if let serde_yaml::Value::Mapping(mapping) = current_level {
-            mapping.insert(
-                serde_yaml::Value::String(leaf_key.to_string()),
-                serde_yaml::Value::String(value.clone()),
+        if let serde_json::Value::Object(map) = current_level {
+            map.insert(
+                leaf_key.to_string(),
+                serde_json::Value::String(value.clone()),
             );
         }
     }
@@ -377,23 +374,21 @@ pub fn write_translation_file(
 ) -> Result<()> {
     let extension = file_path.extension().and_then(|s| s.to_str()).unwrap_or("");
 
-    let nested_map = unflatten_to_nested_map(keys);
+    let nested_json = unflatten_to_json_value(keys);
 
     let content = match extension {
         "yml" | "yaml" => {
-            // 对于 YAML，我们直接使用 unflatten_to_nested_map 的结果
-            serde_yaml::to_string(&nested_map)?
+            // JSON 是 YAML 的子集，所以我们可以将 JSON Value 转换为 YAML Value
+            let yaml_value: serde_yaml::Value = serde_yaml::from_str(&serde_json::to_string(&nested_json)?)?;
+            serde_yaml::to_string(&yaml_value)?
         }
         "json" => {
-            // serde_yaml::Value 可以被 serde_json 序列化
-            let json_value: serde_json::Value = serde_json::from_str(&serde_yaml::to_string(&nested_map)?)?;
-            serde_json::to_string_pretty(&json_value)?
+            serde_json::to_string_pretty(&nested_json)?
         }
         "toml" => {
-            // TOML 需要特殊处理，因为它有更严格的结构
-            // 我们需要将 serde_yaml::Value 转换为 toml::Value
-            let yaml_str = serde_yaml::to_string(&nested_map)?;
-            let toml_value: toml::Value = toml::from_str(&yaml_str)?;
+            // 使用 `try_from` 将 `serde_json::Value` 转换为 `toml::Value`
+            let toml_value = toml::Value::try_from(nested_json)
+                .with_context(|| "无法将中间值转换为 TOML 格式")?;
             toml::to_string_pretty(&toml_value)?
         }
         _ => bail!("不支持的文件扩展名: {}", extension),
