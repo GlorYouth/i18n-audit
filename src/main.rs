@@ -82,6 +82,24 @@ fn main() -> Result<()> {
             
             if config.verbose {
                 println!("找到 {} 个使用中的翻译键", used_keys.len());
+                println!("源代码目录: {}", config.src_path().display());
+                
+                // 输出扫描的文件列表
+                println!("扫描的文件列表:");
+                for entry in WalkDir::new(&config.src_path())
+                    .follow_links(true)
+                    .into_iter()
+                    .filter_map(|e| e.ok())
+                    .filter(|e| e.path().is_file())
+                {
+                    let path = entry.path();
+                    if let Some(ext) = path.extension() {
+                        if ext == "rs" {
+                            println!("  - {}", path.display());
+                        }
+                    }
+                }
+                
                 if !used_keys.is_empty() {
                     println!("使用中的翻译键详情:");
                     for key in &used_keys {
