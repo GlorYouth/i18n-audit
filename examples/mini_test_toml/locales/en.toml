@@ -1,0 +1,20 @@
+[en.greetings]
+hello = "Hello, World!"
+goodbye = "Goodbye!"
+
+[en.user]
+welcome = "Welcome, %{name}!"
+profile = "User Profile"
+
+[en.dynamic]
+key = "This is a dynamic key"
+
+[en.content.section.item]
+"123" = "This is content item #123"
+
+[en.unused]
+key1 = "Unused Key 1"
+key2 = "Unused Key 2"
+
+[en.unused.nested]
+key = "Nested Unused Key" 

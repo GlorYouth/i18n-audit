@@ -1,0 +1,20 @@
+[zh-CN.greetings]
+hello = "你好，世界！"
+goodbye = "再见！"
+
+[zh-CN.user]
+welcome = "欢迎，%{name}！"
+profile = "用户资料"
+
+[zh-CN.dynamic]
+key = "这是一个动态键"
+
+[zh-CN.content.section.item]
+"123" = "这是内容项目 #123"
+
+[zh-CN.unused]
+key1 = "未使用的键1"
+key2 = "未使用的键2"
+
+[zh-CN.unused.nested]
+key = "嵌套的未使用键" 
