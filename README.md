@@ -151,4 +151,6 @@ ignore_pattern = "^dynamic\\."
 
 ## 许可证
 
-MIT 
+本项目采用双重许可： ([MIT 许可证](LICENSE-MIT) 或 [Apache 许可证 2.0 版](LICENSE-APACHE))。
+
+您可以根据自己的偏好选择其中任意一种许可证。 

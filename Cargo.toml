@@ -2,11 +2,12 @@
 name = "i18n-audit"
 version = "0.1.0"
 edition = "2024"
-description = "审计 rust-i18n 项目中未使用的翻译键"
+description = "一个用于审计 rust-i18n 项目中未使用的翻译键的工具"
+license = "MIT OR Apache-2.0"
 authors = ["GlorYouth <gloryouth@gmail.com>"]
 repository = "https://github.com/GlorYouth/i18n-audit"
-readme = "README.md"
-keywords = ["i18n", "audit", "rust"]
+keywords = ["i18n", "rust-i18n", "audit", "linter"]
+categories = ["development-tools", "command-line-utilities"]
 
 [dependencies]
 # 命令行参数解析
