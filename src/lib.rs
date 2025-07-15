@@ -3,3 +3,4 @@ pub mod parser;
 pub mod analyzer;
 pub mod config;
 pub mod report;
+pub mod actions;

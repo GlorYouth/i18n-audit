@@ -34,4 +34,13 @@ colored = "3.0.0"
 pathdiff = "0.2.3"
 prettytable-rs = "0.10"
 
+[lib]
+name = "i18n_audit"
+path = "src/lib.rs"
+
+[[bin]]
+name = "i18n-audit"
+path = "src/main.rs"
+
 [dev-dependencies]
+tempfile = "3.8"
