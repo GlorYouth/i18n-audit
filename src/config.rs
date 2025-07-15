@@ -1,6 +1,10 @@
 use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 
+fn default_true() -> bool {
+    true
+}
+
 /// 应用程序配置
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
@@ -14,6 +18,9 @@ pub struct Config {
     pub threshold: f32,
     /// 忽略模式（正则表达式）
     pub ignore_pattern: Option<String>,
+    /// 默认忽略翻译文件夹下 start_with TODO 的文件
+    #[serde(default = "default_true")]
+    pub ignore_todo_files: bool,
     /// 详细输出模式
     pub verbose: bool,
 }

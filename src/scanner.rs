@@ -270,6 +270,23 @@ mod tests {
     }
 
     #[test]
+    fn test_scan_file_content_with_to_string() {
+        let content = r#"
+        fn main() {
+            println!("欢迎: {}", t!("user.welcome", name = "张三".to_string()));
+            println!("条目: {}", t!("content.section.item.123", count = 5).to_string());
+        }
+        "#;
+        let mut used_keys = Vec::new();
+        
+        scan_file_content(content, "test.rs", &mut used_keys).unwrap();
+        
+        assert_eq!(used_keys.len(), 2);
+        assert_eq!(used_keys[0].key, "user.welcome");
+        assert_eq!(used_keys[1].key, "content.section.item.123");
+    }
+
+    #[test]
     fn test_scan_rust_i18n_example() {
         let content = r#"
         use rust_i18n::t;

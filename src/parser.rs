@@ -4,7 +4,7 @@ use serde::{Serialize, Deserialize};
 use serde_yaml;
 use serde_json;
 use toml;
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fs;
 use std::path::Path;
 use walkdir::WalkDir;
@@ -40,6 +40,16 @@ pub fn parse_translation_files(config: &Config) -> Result<Vec<DefinedKey>> {
         .filter_map(|e| e.ok())
     {
         let path = entry.path();
+        
+        // 如果启用了忽略 TODO 文件，则跳过
+        if config.ignore_todo_files {
+            if let Some(file_name) = path.file_name().and_then(|n| n.to_str()) {
+                if file_name.to_lowercase().starts_with("todo") {
+                    debug!("忽略 TODO 文件: {}", path.display());
+                    continue;
+                }
+            }
+        }
         
         if path.is_file() && path.extension()
             .and_then(|ext| ext.to_str())
@@ -321,5 +331,77 @@ fn parse_toml(content: &str, language: &str, file_path: &str, defined_keys: &mut
         bail!("TOML 顶层必须是表: {}", file_path);
     }
 
+    Ok(())
+} 
+
+/// 将扁平化的键值对（例如 "a.b.c": "value"）转换为嵌套的 serde_yaml::Value
+fn unflatten_to_nested_map(
+    flat_keys: &BTreeMap<String, String>
+) -> serde_yaml::Value {
+    let mut root = serde_yaml::Value::Mapping(serde_yaml::Mapping::new());
+
+    for (full_key, value) in flat_keys {
+        let mut parts: Vec<&str> = full_key.split('.').collect();
+        let leaf_key = parts.pop().unwrap();
+        
+        let mut current_level = &mut root;
+
+        for part in parts {
+            // get_mut or insert a new Mapping
+            let next_level = if let serde_yaml::Value::Mapping(mapping) = current_level {
+                mapping.entry(serde_yaml::Value::String(part.to_string()))
+                    .or_insert_with(|| serde_yaml::Value::Mapping(serde_yaml::Mapping::new()))
+            } else {
+                // Should not happen if the structure is consistent
+                continue;
+            };
+            current_level = next_level;
+        }
+
+        // Insert the leaf value
+        if let serde_yaml::Value::Mapping(mapping) = current_level {
+            mapping.insert(
+                serde_yaml::Value::String(leaf_key.to_string()),
+                serde_yaml::Value::String(value.clone()),
+            );
+        }
+    }
+
+    root
+}
+
+/// 将翻译键写入文件，覆盖现有内容
+pub fn write_translation_file(
+    file_path: &Path,
+    keys: &BTreeMap<String, String>
+) -> Result<()> {
+    let extension = file_path.extension().and_then(|s| s.to_str()).unwrap_or("");
+
+    let nested_map = unflatten_to_nested_map(keys);
+
+    let content = match extension {
+        "yml" | "yaml" => {
+            // 对于 YAML，我们直接使用 unflatten_to_nested_map 的结果
+            serde_yaml::to_string(&nested_map)?
+        }
+        "json" => {
+            // serde_yaml::Value 可以被 serde_json 序列化
+            let json_value: serde_json::Value = serde_json::from_str(&serde_yaml::to_string(&nested_map)?)?;
+            serde_json::to_string_pretty(&json_value)?
+        }
+        "toml" => {
+            // TOML 需要特殊处理，因为它有更严格的结构
+            // 我们需要将 serde_yaml::Value 转换为 toml::Value
+            let yaml_str = serde_yaml::to_string(&nested_map)?;
+            let toml_value: toml::Value = toml::from_str(&yaml_str)?;
+            toml::to_string_pretty(&toml_value)?
+        }
+        _ => bail!("不支持的文件扩展名: {}", extension),
+    };
+
+    fs::write(file_path, content)
+        .with_context(|| format!("无法写入文件: {}", file_path.display()))?;
+
+    info!("成功覆盖文件: {}", file_path.display());
     Ok(())
 } 
