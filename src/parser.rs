@@ -248,21 +248,31 @@ fn extract_keys_from_toml(
 
 /// 解析 YAML 文件
 fn parse_yaml(content: &str, language: &str, file_path: &str, defined_keys: &mut Vec<DefinedKey>) -> Result<()> {
-    let yaml_value: serde_yaml::Value = serde_yaml::from_str(content)
+    let root: serde_yaml::Value = serde_yaml::from_str(content)
         .with_context(|| format!("无法解析 YAML 文件: {}", file_path))?;
-    
-    if let serde_yaml::Value::Mapping(map) = yaml_value {
-        let map_typed: HashMap<String, serde_yaml::Value> = map.iter()
-            .filter_map(|(k, v)| {
-                if let serde_yaml::Value::String(key_str) = k {
-                    Some((key_str.clone(), v.clone()))
-                } else {
-                    None
-                }
-            })
-            .collect();
         
-        extract_keys_from_map(&map_typed, "", language, file_path, defined_keys);
+    if let serde_yaml::Value::Mapping(map) = root {
+        // 转换键为字符串类型
+        let mut map_typed: HashMap<String, serde_yaml::Value> = HashMap::new();
+        for (k, v) in map.iter() {
+            if let Some(key_str) = k.as_str() {
+                map_typed.insert(key_str.to_string(), v.clone());
+            }
+        }
+
+        // 如果顶层键是语言本身，则从下一层开始
+        if map_typed.len() == 1 && map_typed.contains_key(language) {
+            if let Some(serde_yaml::Value::Mapping(nested_map)) = map_typed.get(language) {
+                let nested_map_typed: HashMap<String, serde_yaml::Value> = nested_map.iter()
+                    .filter_map(|(k, v)| k.as_str().map(|s| (s.to_string(), v.clone())))
+                    .collect();
+                extract_keys_from_map(&nested_map_typed, "", language, file_path, defined_keys);
+            }
+        } else {
+            extract_keys_from_map(&map_typed, "", language, file_path, defined_keys);
+        }
+    } else {
+        bail!("YAML 顶层必须是映射/对象: {}", file_path);
     }
     
     Ok(())
@@ -270,20 +280,46 @@ fn parse_yaml(content: &str, language: &str, file_path: &str, defined_keys: &mut
 
 /// 解析 JSON 文件
 fn parse_json(content: &str, language: &str, file_path: &str, defined_keys: &mut Vec<DefinedKey>) -> Result<()> {
-    let json_value: serde_json::Value = serde_json::from_str(content)
+    let root: serde_json::Value = serde_json::from_str(content)
         .with_context(|| format!("无法解析 JSON 文件: {}", file_path))?;
-    
-    extract_keys_from_json(&json_value, "", language, file_path, defined_keys);
+
+    if let serde_json::Value::Object(map) = root {
+        // 如果顶层键是语言本身，则从下一层开始
+        if map.len() == 1 && map.contains_key(language) {
+            if let Some(serde_json::Value::Object(nested_map)) = map.get(language) {
+                let value = serde_json::Value::Object(nested_map.clone());
+                extract_keys_from_json(&value, "", language, file_path, defined_keys);
+            }
+        } else {
+            let value = serde_json::Value::Object(map);
+            extract_keys_from_json(&value, "", language, file_path, defined_keys);
+        }
+    } else {
+        bail!("JSON 顶层必须是对象: {}", file_path);
+    }
     
     Ok(())
 }
 
 /// 解析 TOML 文件
 fn parse_toml(content: &str, language: &str, file_path: &str, defined_keys: &mut Vec<DefinedKey>) -> Result<()> {
-    let toml_value: toml::Value = toml::from_str(content)
+    let root: toml::Value = toml::from_str(content)
         .with_context(|| format!("无法解析 TOML 文件: {}", file_path))?;
-    
-    extract_keys_from_toml(&toml_value, "", language, file_path, defined_keys);
-    
+
+    if let toml::Value::Table(table) = root {
+        // 如果顶层键是语言本身，则从下一层开始
+        if table.len() == 1 && table.contains_key(language) {
+            if let Some(toml::Value::Table(nested_table)) = table.get(language) {
+                let value = toml::Value::Table(nested_table.clone());
+                extract_keys_from_toml(&value, "", language, file_path, defined_keys);
+            }
+        } else {
+            let value = toml::Value::Table(table);
+            extract_keys_from_toml(&value, "", language, file_path, defined_keys);
+        }
+    } else {
+        bail!("TOML 顶层必须是表: {}", file_path);
+    }
+
     Ok(())
 } 

@@ -27,7 +27,7 @@ pub fn scan_source_code(config: &Config) -> Result<Vec<UsedKey>> {
     info!("正在扫描源代码目录: {}", src_path.display());
     
     let mut used_keys = Vec::new();
-    let rust_file_extensions = [".rs"];
+    let rust_file_extensions = ["rs"];
     
     for entry in WalkDir::new(&src_path)
         .follow_links(true)
@@ -83,6 +83,11 @@ fn scan_file_content(content: &str, file_path: &str, used_keys: &mut Vec<UsedKey
     
     // 遍历每一行查找宏调用
     for (line_idx, line) in content.lines().enumerate() {
+        // 排除 format! 宏
+        if line.contains("format!") {
+            continue;
+        }
+
         // 处理命名空间的字面量键
         if line.contains("rust_i18n::t!") {
             // 处理带命名空间的字面量键: rust_i18n::t!("key") 

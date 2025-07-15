@@ -1,222 +1,178 @@
-use anyhow::{Result, Context};
+use anyhow::{Context, Result};
 use colored::*;
-use log::info;
-use serde::{Serialize, Deserialize};
 use serde_yaml;
 use serde_json;
-use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
+use prettytable::{row, Cell, Row, Table};
 
-use crate::analyzer::AnalysisResult;
-use crate::config::Config;
+use crate::analyzer::{AnalysisResult, MissingKey, UnusedKey};
 
-/// 序列化的分析结果，用于输出为 JSON/YAML
-#[derive(Serialize, Deserialize, Debug)]
-struct SerializableResult {
-    /// 未使用的翻译键，按语言分组
-    unused_keys: serde_json::Value,
-    /// 缺少翻译的使用键
-    missing_keys: serde_json::Value,
-    /// 动态键
-    dynamic_keys: serde_json::Value,
-    /// 统计信息
-    stats: Stats,
-}
+pub fn print_text_report(writer: &mut dyn Write, result: &AnalysisResult, threshold: f32) -> Result<()> {
+    writeln!(writer, "\n{}", "I18n 翻译键审计报告".bold().underline())?;
 
-/// 统计信息
-#[derive(Serialize, Deserialize, Debug)]
-struct Stats {
-    /// 总翻译键数量
-    total_keys: usize,
-    /// 未使用的翻译键数量
-    total_unused: usize,
-    /// 缺少翻译的键数量
-    total_missing: usize,
-    /// 动态键数量
-    total_dynamic: usize,
-    /// 未使用翻译键的百分比
-    unused_percentage: f32,
-}
+    // 打印统计信息
+    print_stats_table(writer, result)?;
 
-/// 生成报告
-pub fn generate_report(
-    result: &AnalysisResult,
-    format: &str,
-    output_path: Option<&Path>,
-    config: &Config,
-) -> Result<()> {
-    info!("正在生成报告，格式: {}", format);
-    
-    match format {
-        "text" => generate_text_report(result, output_path, config)?,
-        "json" => generate_json_report(result, output_path, config)?,
-        "yaml" => generate_yaml_report(result, output_path, config)?,
-        _ => {
-            anyhow::bail!("不支持的输出格式: {}，支持的格式: text, json, yaml", format);
-        }
-    }
-    
-    Ok(())
-}
-
-/// 生成文本格式的报告
-fn generate_text_report(
-    result: &AnalysisResult,
-    output_path: Option<&Path>,
-    config: &Config,
-) -> Result<()> {
-    let mut output = Vec::new();
-    
-    writeln!(&mut output, "\n{}", "I18n 翻译键审计报告".bold().underline())?;
-    writeln!(&mut output, "\n{}", "统计信息:".bold())?;
-    writeln!(&mut output, "  总翻译键数量: {}", result.total_keys)?;
-    writeln!(&mut output, "  未使用的翻译键数量: {}", result.total_unused)?;
-    writeln!(&mut output, "  缺少翻译的键数量: {}", result.total_missing)?;
-    writeln!(&mut output, "  动态键数量: {}", result.total_dynamic)?;
-    writeln!(&mut output, "  未使用翻译键百分比: {:.2}%", result.unused_percentage)?;
-    
-    // 未使用的键（按语言分组）
+    // 打印未使用的翻译键
     if !result.unused_keys.is_empty() {
-        writeln!(&mut output, "\n{}", "未使用的翻译键:".bold().yellow())?;
-        
-        for (language, keys) in &result.unused_keys {
-            writeln!(&mut output, "\n  语言: {}", language.bold())?;
-            
-            for (idx, unused_key) in keys.iter().enumerate() {
-                writeln!(&mut output, "    {}. {} ({})", 
-                    idx + 1, 
-                    unused_key.key.yellow(), 
-                    unused_key.file_path
-                )?;
-                
-                if config.verbose {
-                    writeln!(&mut output, "       值: \"{}\"", unused_key.value)?;
-                }
-            }
-        }
+        writeln!(
+            writer,
+            "\n{}",
+            "未使用的翻译键:".yellow().bold()
+        )?;
+        print_unused_keys_table(writer, &result.unused_keys)?;
     }
-    
-    // 缺少翻译的键
+
+    // 打印缺少翻译的键
     if !result.missing_keys.is_empty() {
-        writeln!(&mut output, "\n{}", "缺少翻译的键:".bold().red())?;
-        
-        for (idx, missing_key) in result.missing_keys.iter().enumerate() {
-            writeln!(&mut output, "  {}. {} ({}:{})", 
-                idx + 1,
-                missing_key.key.red(),
-                missing_key.file_path,
-                missing_key.line_number
-            )?;
-            
-            writeln!(&mut output, "     缺少语言: {}", 
-                missing_key.missing_languages.join(", ")
-            )?;
-        }
+        writeln!(
+            writer,
+            "\n{}",
+            "缺少翻译的键:".red().bold()
+        )?;
+        print_missing_keys_table(writer, &result.missing_keys)?;
     }
-    
-    // 动态键
+
+    // 打印动态键
     if !result.dynamic_keys.is_empty() {
-        writeln!(&mut output, "\n{}", "动态键:".bold().blue())?;
-        
-        for (idx, dynamic_key) in result.dynamic_keys.iter().enumerate() {
-            writeln!(&mut output, "  {}. {} ({}:{})", 
-                idx + 1,
-                dynamic_key.pattern.blue(),
-                dynamic_key.file_path,
-                dynamic_key.line_number
-            )?;
+        writeln!(writer, "\n{}", "动态键:".cyan().bold())?;
+        let mut table = Table::new();
+        table.set_format(*prettytable::format::consts::FORMAT_DEFAULT);
+        table.set_titles(row![b => "动态键模式", "位置"]);
+
+        for key in &result.dynamic_keys {
+            table.add_row(row![
+                key.pattern,
+                format!("{}:{}", key.file_path, key.line_number)
+            ]);
         }
+        table.print(writer)?;
     }
-    
-    // 添加删除建议
-    if result.unused_percentage > config.threshold {
-        writeln!(&mut output, "\n{}", "建议:".bold())?;
-        writeln!(&mut output, "  未使用的翻译键比例 ({:.2}%) 超过阈值 ({:.2}%)，建议清理未使用的翻译键。", 
-            result.unused_percentage, 
-            config.threshold
+
+    // 打印建议
+    if result.unused_percentage > threshold {
+        writeln!(
+            writer,
+            "\n{}: {}",
+            "建议".bold(),
+            format!(
+                "未使用的翻译键比例 ({:.2}%) 超过阈值 ({:.2}%)，建议清理未使用的翻译键。",
+                result.unused_percentage, threshold
+            )
+            .yellow()
+        )?;
+    } else {
+        writeln!(
+            writer,
+            "\n{}: {}",
+            "建议".bold(),
+            "干得不错！未使用的翻译键比例在阈值范围内。".green()
         )?;
     }
-    
-    // 输出报告
-    if let Some(path) = output_path {
-        fs::write(path, output)
-            .with_context(|| format!("无法写入报告文件: {}", path.display()))?;
-        
-        info!("报告已写入文件: {}", path.display());
-    } else {
-        io::stdout().write_all(&output)?;
-    }
-    
+
     Ok(())
 }
 
-/// 生成 JSON 格式的报告
-fn generate_json_report(
-    result: &AnalysisResult,
-    output_path: Option<&Path>,
-    _config: &Config,
-) -> Result<()> {
-    // 将分析结果转换为可序列化的结构
-    let serializable = SerializableResult {
-        unused_keys: serde_json::to_value(&result.unused_keys)?,
-        missing_keys: serde_json::to_value(&result.missing_keys)?,
-        dynamic_keys: serde_json::to_value(&result.dynamic_keys)?,
-        stats: Stats {
-            total_keys: result.total_keys,
-            total_unused: result.total_unused,
-            total_missing: result.total_missing,
-            total_dynamic: result.total_dynamic,
-            unused_percentage: result.unused_percentage,
-        },
-    };
+fn print_stats_table(writer: &mut dyn Write, result: &AnalysisResult) -> Result<()> {
+    let mut table = Table::new();
+    table.set_format(*prettytable::format::consts::FORMAT_BOX_CHARS);
     
-    let json = serde_json::to_string_pretty(&serializable)?;
+    table.set_titles(row![b -> "统计项目", b -> "值"]);
+    table.add_row(row![
+        "总翻译键数量", result.total_keys.to_string().green()
+    ]);
+    table.add_row(row![
+        "未使用的翻译键", result.total_unused.to_string().yellow()
+    ]);
+    table.add_row(row![
+        "缺少翻译的键", result.total_missing.to_string().red()
+    ]);
+    table.add_row(row![
+        "动态键", result.total_dynamic.to_string().cyan()
+    ]);
+    table.add_row(row![
+        "未使用比例", format!("{:.2}%", result.unused_percentage).yellow()
+    ]);
     
-    // 输出报告
-    if let Some(path) = output_path {
-        fs::write(path, json)
-            .with_context(|| format!("无法写入报告文件: {}", path.display()))?;
-        
-        info!("JSON 报告已写入文件: {}", path.display());
-    } else {
-        println!("{}", json);
-    }
-    
+    table.print(writer)?;
     Ok(())
 }
 
-/// 生成 YAML 格式的报告
-fn generate_yaml_report(
-    result: &AnalysisResult,
-    output_path: Option<&Path>,
-    _config: &Config,
+fn print_unused_keys_table(
+    writer: &mut dyn Write,
+    unused_keys: &std::collections::HashMap<String, Vec<UnusedKey>>,
 ) -> Result<()> {
-    // 将分析结果转换为可序列化的结构
-    let serializable = SerializableResult {
-        unused_keys: serde_json::to_value(&result.unused_keys)?,
-        missing_keys: serde_json::to_value(&result.missing_keys)?,
-        dynamic_keys: serde_json::to_value(&result.dynamic_keys)?,
-        stats: Stats {
-            total_keys: result.total_keys,
-            total_unused: result.total_unused,
-            total_missing: result.total_missing,
-            total_dynamic: result.total_dynamic,
-            unused_percentage: result.unused_percentage,
-        },
-    };
-    
-    let yaml = serde_yaml::to_string(&serializable)?;
-    
-    // 输出报告
-    if let Some(path) = output_path {
-        fs::write(path, yaml)
-            .with_context(|| format!("无法写入报告文件: {}", path.display()))?;
-        
-        info!("YAML 报告已写入文件: {}", path.display());
-    } else {
-        println!("{}", yaml);
+    let mut table = Table::new();
+    table.set_format(*prettytable::format::consts::FORMAT_DEFAULT);
+    table.set_titles(row![b => "语言", "翻译键", "文件路径", "值"]);
+
+    for (language, keys) in unused_keys {
+        for (i, key) in keys.iter().enumerate() {
+            let lang_cell = if i == 0 {
+                Cell::new(language).style_spec("b")
+            } else {
+                Cell::new("")
+            };
+            
+            table.add_row(Row::new(vec![
+                lang_cell,
+                Cell::new(&key.key),
+                Cell::new(&key.file_path),
+                Cell::new(&key.value.chars().take(50).collect::<String>()),
+            ]));
+        }
     }
     
+    table.print(writer)?;
+    Ok(())
+}
+
+fn print_missing_keys_table(writer: &mut dyn Write, missing_keys: &[MissingKey]) -> Result<()> {
+    let mut table = Table::new();
+    table.set_format(*prettytable::format::consts::FORMAT_DEFAULT);
+    table.set_titles(row![b => "翻译键", "位置", "缺少的语言"]);
+
+    for key in missing_keys {
+        table.add_row(row![
+            key.key,
+            format!("{}:{}", key.file_path, key.line_number),
+            key.missing_languages.join(", ").red()
+        ]);
+    }
+    
+    table.print(writer)?;
+    Ok(())
+}
+
+/// 将分析结果以 JSON 格式打印
+pub fn print_json_report(writer: &mut dyn Write, result: &AnalysisResult, output_path: Option<&Path>) -> Result<()> {
+    let json_str = serde_json::to_string_pretty(result)?;
+    
+    if let Some(path) = output_path {
+        std::fs::write(path, json_str)
+            .with_context(|| format!("无法将 JSON 报告写入文件: {}", path.display()))?;
+    } else {
+        writeln!(writer, "{}", json_str)?;
+    }
+
+    Ok(())
+} 
+
+/// 将分析结果以 YAML 格式打印
+pub fn print_yaml_report(
+    _writer: &mut dyn Write,
+    result: &AnalysisResult,
+    output_path: Option<&Path>,
+) -> Result<()> {
+    let yaml_str = serde_yaml::to_string(result)?;
+
+    if let Some(path) = output_path {
+        std::fs::write(path, yaml_str)
+            .with_context(|| format!("无法将 YAML 报告写入文件: {}", path.display()))?;
+    } else {
+        println!("{}", yaml_str);
+    }
+
     Ok(())
 } 

@@ -176,9 +176,18 @@ fn main() -> Result<()> {
             let analysis_result = analyzer::analyze(&used_keys, &defined_keys, &config)
                 .context("分析翻译键使用情况失败")?;
             
-            // 4. 生成报告
-            report::generate_report(&analysis_result, &format, output.as_deref(), &config)
-                .context("生成报告失败")?;
+            // 4. 根据格式生成报告
+            let mut writer: Box<dyn std::io::Write> = if let Some(output_path) = &output {
+                Box::new(std::fs::File::create(output_path)?)
+            } else {
+                Box::new(std::io::stdout())
+            };
+            
+            match format.as_str() {
+                "json" => report::print_json_report(&mut writer, &analysis_result, output.as_deref())?,
+                "yaml" => report::print_yaml_report(&mut writer, &analysis_result, output.as_deref())?,
+                _ => report::print_text_report(&mut writer, &analysis_result, config.threshold)?,
+            }
             
             // 5. 如果未使用的翻译键百分比超过阈值，返回错误以便在 CI 中失败
             if analysis_result.unused_percentage > config.threshold {

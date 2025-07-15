@@ -1,7 +1,8 @@
+use serde::{Serialize, Deserialize};
 use std::path::PathBuf;
 
 /// 应用程序配置
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Config {
     /// 项目根目录
     pub project_path: PathBuf,
