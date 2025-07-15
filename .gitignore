@@ -1,0 +1,20 @@
+# Generated files
+/target/
+**/*.rs.bk
+
+# IDE files
+/.idea/
+/.vscode/
+/.vs/
+*.iml
+
+# Build artifacts
+Cargo.lock
+
+# Example build
+/examples/*/target/
+
+# Report outputs
+*.json
+*.yaml
+*.yml.bak

@@ -1,0 +1,18 @@
+en:
+  greetings:
+    hello: "Hello, World!"
+    goodbye: "Goodbye!"
+  user:
+    welcome: "Welcome, %{name}!"
+    profile: "User Profile"
+  dynamic:
+    key: "This is a dynamic key"
+  content:
+    section:
+      item:
+        123: "This is content item #123"
+  unused:
+    key1: "Unused Key 1"
+    key2: "Unused Key 2"
+    nested:
+      key: "Nested Unused Key" 
