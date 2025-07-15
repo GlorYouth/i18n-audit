@@ -1,121 +1,135 @@
+[For the Chinese version, please see `README_CN.md`](README_CN.md)
+
 # I18n-Audit
 
-一个用于审计 rust-i18n 项目中未使用的翻译键的工具。
+A tool for auditing unused translation keys in rust-i18n projects.
 
-## 特性
+## Features
 
-- 扫描 Rust 源代码中的 `t!()` 宏调用，提取所有使用的翻译键
-- 解析 YAML/JSON/TOML 翻译文件，提取所有定义的翻译键
-- 比对两者，生成未使用翻译的报告
-- 支持动态键的分析和警告
-- 可配置的警告阈值和忽略模式
-- 支持多种输出格式：文本、JSON、YAML
-- 可集成到 CI 流程中
+- Scans Rust source code for `t!()` macro calls to extract all used translation keys.
+- Parses YAML/JSON/TOML translation files to extract all defined translation keys.
+- Compares the two to generate a report of unused translations.
+- Supports analysis and warnings for dynamic keys.
+- **Extracts in-use translation keys**, automatically cleaning up keys not used in the code.
+- **Formats translation files**, aligning keys across all language files and providing placeholders for blank translations.
+- Configurable warning threshold and ignore patterns.
+- Supports multiple output formats: Text, JSON, YAML.
+- Can be integrated into CI workflows.
 
-## 安装
+## Installation
 
-注意：本项目目前没有发布到 crates.io 的计划。请使用以下方法之一进行安装：
+Note: This project is not currently planned for release on crates.io. Please use one of the following methods for installation:
 
-**1. 通过 `cargo install` 直接从 GitHub 安装 (推荐):**
+**1. Install directly from GitHub via `cargo install` (Recommended):**
 ```bash
 cargo install --git https://github.com/GlorYouth/i18n-audit
 ```
 
-**2. 从源码构建:**
+**2. Build from source:**
 ```bash
 git clone https://github.com/GlorYouth/i18n-audit.git
 cd i18n-audit
 cargo build --release
 ```
 
-## 使用方法
-
-基本用法：
+## Usage
 
 ```bash
-# 在当前目录运行审计
+# Run an audit (run is the default command)
 i18n-audit
 
-# 指定项目路径
+# Extract the used translation keys and overwrite the translation files with them
+# This will remove all keys not used in the code
+i18n-audit extract
+
+# Format all translation files to align their keys
+# For missing translations, an empty string "" or '' will be used as a placeholder
+i18n-audit format
+
+# Specify the project path
 i18n-audit -p /path/to/project
 
-# 指定源代码和翻译文件目录
+# Specify the source code and translation file directories
 i18n-audit --src-dir src --locales-dir locales
 
-# 生成 JSON 格式报告并输出到文件
+# Generate a JSON format report and output to a file
 i18n-audit run -f json -o report.json
 
-# 设置未使用翻译键的警告阈值（百分比）
+# Set the warning threshold for unused translation keys (percentage)
 i18n-audit --threshold 10
 
-# 忽略特定模式的键（正则表达式）
+# Ignore keys matching a specific pattern (regular expression)
 i18n-audit --ignore-pattern "^dynamic\\."
 
-# 详细模式
+# By default, the tool ignores filenames starting with `TODO`
+# Use this flag to include them
+i18n-audit --no-ignore-todo
+
+# Verbose mode
 i18n-audit -v
 ```
 
-## 输出示例
+## Output Example
 
-文本格式输出：
+Text format output:
 
 ```
-I18n 翻译键审计报告
+I18n Translation Key Audit Report
 ┌────────────────┬──────────┐
-│ 统计项目       │ 值       │
+│ Statistic Item │ Value    │
 ├────────────────┼──────────┤
-│ 总翻译键数量   │ 16       │
+│ Total Keys     │ 16       │
 ├────────────────┼──────────┤
-│ 未使用的翻译键 │ 8        │
+│ Unused Keys    │ 8        │
 ├────────────────┼──────────┤
-│ 缺少翻译的键   │ 1        │
+│ Missing Keys   │ 1        │
 ├────────────────┼──────────┤
-│ 动态键         │ 1        │
+│ Dynamic Keys   │ 1        │
 ├────────────────┼──────────┤
-│ 未使用比例     │ 50.00%   │
+│ Unused Ratio   │ 50.00%   │
 └────────────────┴──────────┘
 
-未使用的翻译键:
-+-------+-------------------+-------------------+-------------------+
-| 语言  | 翻译键            | 文件路径          | 值                |
-+=======+===================+===================+===================+
-| en    | unused.key2       | locales\en.yml    | Unused Key 2      |
-+-------+-------------------+-------------------+-------------------+
-|       | unused.key1       | locales\en.yml    | Unused Key 1      |
-+-------+-------------------+-------------------+-------------------+
-|       | unused.nested.key | locales\en.yml    | Nested Unused Key |
-+-------+-------------------+-------------------+-------------------+
-|       | user.profile      | locales\en.yml    | User Profile      |
-+-------+-------------------+-------------------+-------------------+
-| zh-CN | unused.key1       | locales\zh-CN.yml | 未使用的键1       |
-+-------+-------------------+-------------------+-------------------+
-|       | unused.key2       | locales\zh-CN.yml | 未使用的键2       |
-+-------+-------------------+-------------------+-------------------+
-|       | unused.nested.key | locales\zh-CN.yml | 嵌套的未使用键    |
-+-------+-------------------+-------------------+-------------------+
-|       | user.profile      | locales\zh-CN.yml | 用户资料          |
-+-------+-------------------+-------------------+-------------------+
+Unused Translation Keys:
++----------+-------------------+-------------------+-------------------+
+| Language | Key               | File Path         | Value             |
++==========+===================+===================+===================+
+| en       | unused.key2       | locales\en.yml    | Unused Key 2      |
++----------+-------------------+-------------------+-------------------+
+|          | unused.key1       | locales\en.yml    | Unused Key 1      |
++----------+-------------------+-------------------+-------------------+
+|          | unused.nested.key | locales\en.yml    | Nested Unused Key |
++----------+-------------------+-------------------+-------------------+
+|          | user.profile      | locales\en.yml    | User Profile      |
++----------+-------------------+-------------------+-------------------+
+| zh-CN    | unused.key1       | locales\zh-CN.yml | 未使用的键1       |
++----------+-------------------+-------------------+-------------------+
+|          | unused.key2       | locales\zh-CN.yml | 未使用的键2       |
++----------+-------------------+-------------------+-------------------+
+|          | unused.nested.key | locales\zh-CN.yml | 嵌套的未使用键    |
++----------+-------------------+-------------------+-------------------+
+|          | user.profile      | locales\zh-CN.yml | 用户资料          |
++----------+-------------------+-------------------+-------------------+
 
-缺少翻译的键:
-+--------------------------+----------------+-------------+
-| 翻译键                   | 位置           | 缺少的语言  |
-+==========================+================+=============+
-| content.section.item.123 | src\main.rs:26 | en, zh-CN   |
-+--------------------------+----------------+-------------+
+Missing Translation Keys:
++--------------------------+----------------+---------------------+
+| Key                      | Location       | Missing Languages   |
++==========================+================+=====================+
+| content.section.item.123 | src\main.rs:26 | en, zh-CN           |
++--------------------------+----------------+---------------------+
 
-动态键:
+Dynamic Keys:
 +-------------+----------------+
-| 动态键模式  | 位置           |
+| Key Pattern | Location       |
 +=============+================+
 | dynamic.key | src\main.rs:19 |
 +-------------+----------------+
 
-建议: 未使用的翻译键比例 (50.00%) 超过阈值 (20.00%)，建议清理未使用的翻译键。
+Recommendation: The percentage of unused translation keys (50.00%) exceeds the threshold (20.00%). It is recommended to clean up unused translation keys.
 ```
 
-## CI 集成
+## CI Integration
 
-在 GitHub Actions 工作流中使用示例：
+Example usage in a GitHub Actions workflow:
 
 ```yaml
 name: I18n Audit
@@ -137,9 +151,9 @@ jobs:
         run: i18n-audit --threshold 15
 ```
 
-## 配置
+## Configuration
 
-可以在项目根目录创建 `.i18n-audit.toml` 文件进行配置：
+You can create an `.i18n-audit.toml` file in the project root for configuration:
 
 ```toml
 # .i18n-audit.toml
@@ -149,8 +163,8 @@ threshold = 15.0
 ignore_pattern = "^dynamic\\."
 ```
 
-## 许可证
+## License
 
-本项目采用双重许可： ([MIT 许可证](LICENSE-MIT) 或 [Apache 许可证 2.0 版](LICENSE-APACHE))。
+This project is dual-licensed under either the [MIT License](LICENSE-MIT) or the [Apache License, Version 2.0](LICENSE-APACHE).
 
-您可以根据自己的偏好选择其中任意一种许可证。 
+You may choose either license at your discretion. 
