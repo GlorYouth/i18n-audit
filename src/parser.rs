@@ -196,8 +196,17 @@ fn extract_keys_from_json(
                         // 递归处理嵌套对象
                         extract_keys_from_json(val, &full_key, language, file_path, defined_keys);
                     }
+                    serde_json::Value::String(s) => {
+                        // 显式处理字符串，获取原始值
+                        defined_keys.push(DefinedKey {
+                            key: full_key.clone(),
+                            language: language.to_string(),
+                            value: s.clone(),
+                            file_path: file_path.to_string(),
+                        });
+                    }
                     _ => {
-                        // 添加叶节点键值对
+                        // 对其他类型（数字、布尔等）使用 to_string
                         defined_keys.push(DefinedKey {
                             key: full_key.clone(),
                             language: language.to_string(),
@@ -237,8 +246,17 @@ fn extract_keys_from_toml(
                         // 递归处理嵌套表
                         extract_keys_from_toml(val, &full_key, language, file_path, defined_keys);
                     }
+                    toml::Value::String(s) => {
+                        // 显式处理字符串，获取原始值
+                        defined_keys.push(DefinedKey {
+                            key: full_key.clone(),
+                            language: language.to_string(),
+                            value: s.clone(),
+                            file_path: file_path.to_string(),
+                        });
+                    }
                     _ => {
-                        // 添加叶节点键值对
+                        // 对其他类型（数字、布尔等）使用 to_string
                         defined_keys.push(DefinedKey {
                             key: full_key.clone(),
                             language: language.to_string(),

@@ -1,8 +1,4 @@
-mod scanner;
-mod parser;
-mod analyzer;
-mod config;
-mod report;
+use i18n_audit::{config, scanner, parser, analyzer, report};
 
 use clap::{Parser, Subcommand};
 use anyhow::{Result, Context};
