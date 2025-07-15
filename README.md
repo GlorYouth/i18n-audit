@@ -14,14 +14,16 @@
 
 ## 安装
 
+注意：本项目目前没有发布到 crates.io 的计划。请使用以下方法之一进行安装：
+
+**1. 通过 `cargo install` 直接从 GitHub 安装 (推荐):**
 ```bash
-cargo install i18n-audit
+cargo install --git https://github.com/GlorYouth/i18n-audit
 ```
 
-或者从源码构建：
-
+**2. 从源码构建:**
 ```bash
-git clone https://github.com/yourusername/i18n-audit.git
+git clone https://github.com/GlorYouth/i18n-audit.git
 cd i18n-audit
 cargo build --release
 ```
@@ -59,33 +61,56 @@ i18n-audit -v
 
 ```
 I18n 翻译键审计报告
-
-统计信息:
-  总翻译键数量: 120
-  未使用的翻译键数量: 25
-  缺少翻译的键数量: 5
-  动态键数量: 3
-  未使用翻译键百分比: 20.83%
+┌────────────────┬──────────┐
+│ 统计项目       │ 值       │
+├────────────────┼──────────┤
+│ 总翻译键数量   │ 16       │
+├────────────────┼──────────┤
+│ 未使用的翻译键 │ 8        │
+├────────────────┼──────────┤
+│ 缺少翻译的键   │ 1        │
+├────────────────┼──────────┤
+│ 动态键         │ 1        │
+├────────────────┼──────────┤
+│ 未使用比例     │ 50.00%   │
+└────────────────┴──────────┘
 
 未使用的翻译键:
-
-  语言: en
-    1. common.unused.key1 (locales/en.yml)
-    2. common.unused.key2 (locales/en.yml)
-
-  语言: zh-CN
-    1. common.unused.key1 (locales/zh-CN.yml)
-    2. common.unused.key2 (locales/zh-CN.yml)
++-------+-------------------+-------------------+-------------------+
+| 语言  | 翻译键            | 文件路径          | 值                |
++=======+===================+===================+===================+
+| en    | unused.key2       | locales\en.yml    | Unused Key 2      |
++-------+-------------------+-------------------+-------------------+
+|       | unused.key1       | locales\en.yml    | Unused Key 1      |
++-------+-------------------+-------------------+-------------------+
+|       | unused.nested.key | locales\en.yml    | Nested Unused Key |
++-------+-------------------+-------------------+-------------------+
+|       | user.profile      | locales\en.yml    | User Profile      |
++-------+-------------------+-------------------+-------------------+
+| zh-CN | unused.key1       | locales\zh-CN.yml | 未使用的键1       |
++-------+-------------------+-------------------+-------------------+
+|       | unused.key2       | locales\zh-CN.yml | 未使用的键2       |
++-------+-------------------+-------------------+-------------------+
+|       | unused.nested.key | locales\zh-CN.yml | 嵌套的未使用键    |
++-------+-------------------+-------------------+-------------------+
+|       | user.profile      | locales\zh-CN.yml | 用户资料          |
++-------+-------------------+-------------------+-------------------+
 
 缺少翻译的键:
-  1. common.button.submit (src/components/form.rs:15)
-     缺少语言: zh-CN, fr
++--------------------------+----------------+-------------+
+| 翻译键                   | 位置           | 缺少的语言  |
++==========================+================+=============+
+| content.section.item.123 | src\main.rs:26 | en, zh-CN   |
++--------------------------+----------------+-------------+
 
 动态键:
-  1. user.profile.{} (src/user/profile.rs:23)
++-------------+----------------+
+| 动态键模式  | 位置           |
++=============+================+
+| dynamic.key | src\main.rs:19 |
++-------------+----------------+
 
-建议:
-  未使用的翻译键比例 (20.83%) 超过阈值 (20.00%)，建议清理未使用的翻译键。
+建议: 未使用的翻译键比例 (50.00%) 超过阈值 (20.00%)，建议清理未使用的翻译键。
 ```
 
 ## CI 集成
@@ -107,7 +132,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install i18n-audit
-        run: cargo install i18n-audit
+        run: cargo install --git https://github.com/GlorYouth/i18n-audit
       - name: Run i18n-audit
         run: i18n-audit --threshold 15
 ```
